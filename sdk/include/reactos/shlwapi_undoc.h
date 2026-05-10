@@ -3,7 +3,7 @@
  * LICENSE:     LGPL-2.1-or-later (https://spdx.org/licenses/LGPL-2.1-or-later)
  * PURPOSE:     Undocumented SHLWAPI definitions
  * COPYRIGHT:   Copyright 2009 Andrew Hill <ash77 at domain reactos.org>
- *              Copyright 2025 Katayama Hirofumi MZ <katayama.hirofumi.mz@gmail.com>
+ *              Copyright 2026 Katayama Hirofumi MZ <katayama.hirofumi.mz@gmail.com>
  */
 
 #pragma once
@@ -111,6 +111,15 @@ DWORD WINAPI SHFillRectClr(HDC hDC, LPCRECT pRect, COLORREF cRef);
 int WINAPI SHSearchMapInt(const int *lpKeys, const int *lpValues, int iLen, int iKey);
 
 HRESULT WINAPI
+SHInvokeCommandsOnContextMenu(
+    _In_opt_ HWND hwnd,
+    _In_opt_ IUnknown *punkSite,
+    _In_ IContextMenu *pCM,
+    _In_ DWORD fMask,
+    _In_reads_opt_(cVerbs) PCSTR *pVerbs,
+    _In_ UINT cVerbs);
+
+HRESULT WINAPI
 MayQSForward(
     _In_ IUnknown *lpUnknown,
     _In_ INT nUnknown,
@@ -143,6 +152,9 @@ DATABLOCK_HEADER* WINAPI SHFindDataBlock(LPDBLIST lpList, DWORD dwSignature);
 HRESULT WINAPI SHWriteDataBlockList(IStream* lpStream, LPDBLIST lpList);
 HRESULT WINAPI SHReadDataBlockList(IStream* lpStream, LPDBLIST* lppList);
 VOID WINAPI SHFreeDataBlockList(LPDBLIST lpList);
+
+HRESULT WINAPI IStream_ReadPidl(_In_ IStream *pstm, _Out_ LPITEMIDLIST *ppidlOut);
+HRESULT WINAPI IStream_WritePidl(_In_ IStream *pstm, _In_ LPCITEMIDLIST pidlWrite);
 
 LONG
 WINAPI
@@ -389,6 +401,17 @@ BOOL WINAPI PathFileExistsAndAttributesA(LPCSTR lpszPath, DWORD* dwAttr);
 BOOL WINAPI PathFileExistsAndAttributesW(LPCWSTR lpszPath, DWORD* dwAttr);
 #endif
 
+LPSTR  WINAPI StrCpyNXA(LPSTR lpszDest, LPCSTR lpszSrc, int iLen);
+LPWSTR WINAPI StrCpyNXW(LPWSTR lpszDest, LPCWSTR lpszSrc, int iLen);
+
+#ifdef UNICODE
+    #define PathIsValidChar PathIsValidCharW
+    #define StrCpyNX StrCpyNXW
+#else
+    #define PathIsValidChar PathIsValidCharA
+    #define StrCpyNX StrCpyNXA
+#endif
+
 BOOL WINAPI
 IContextMenu_Invoke(
     _In_ IContextMenu *pContextMenu,
@@ -431,6 +454,32 @@ DWORD WINAPI SHGetObjectCompatFlags(IUnknown *pUnk, const CLSID *clsid);
 
 DWORD WINAPI SHGetAppCompatFlags(_In_ DWORD dwMask);
 
+HRESULT WINAPI
+IUnknown_QueryServiceForWebBrowserApp(
+    _In_ IUnknown* lpUnknown,
+    _In_ REFGUID riid,
+    _Out_ LPVOID *lppOut);
+
+typedef INT_PTR (CALLBACK *SHDIALOGPROC)(
+    PVOID  pThis,
+    HWND   hWnd,
+    UINT   uMsg,
+    WPARAM wParam,
+    LPARAM lParam);
+
+INT_PTR WINAPI
+SHDialogBox(
+    _In_opt_ HINSTANCE hInstance,
+    _In_ PCSTR lpTemplateName,
+    _In_opt_ HWND hWndParent,
+    _In_opt_ SHDIALOGPROC fn,
+    _In_opt_ PVOID pThis);
+
+PSTR WINAPI CharLowerNoDBCSA(_Inout_ PSTR lpString);
+PWSTR WINAPI CharLowerNoDBCSW(_Inout_ PWSTR lpString);
+PSTR WINAPI CharUpperNoDBCSA(_Inout_ PSTR lpString);
+PWSTR WINAPI CharUpperNoDBCSW(_Inout_ PWSTR lpString);
+
 /*****************************************************************************
  * IAssociationElementOld interface
  *
@@ -462,6 +511,112 @@ DECLARE_INTERFACE_(IAssociationElementOld, IUnknown) // {E58B1ABF-9596-4DBA-8997
 #define IAssociationElementOld_QueryExists(T,a,b) (T)->lpVtbl->QueryExists(T,a,b)
 #define IAssociationElementOld_QueryDirect(T,a,b,c) (T)->lpVtbl->QueryDirect(T,a,b,c)
 #define IAssociationElementOld_QueryObject(T,a,b,c,d) (T)->lpVtbl->QueryObject(T,a,b,c,d)
+#endif
+
+/*****************************************************************************
+ * ZoneCheck*
+ */
+
+HRESULT WINAPI
+ZoneCheckUrlExCacheA(
+    _In_                             PCSTR                     pszUrl,
+    _Out_writes_bytes_opt_(cbPolicy) PBYTE                     pbPolicy,
+    _In_                             DWORD                     cbPolicy,
+    _In_reads_bytes_opt_(cbContext)  PBYTE                     pbContext,
+    _In_                             DWORD                     cbContext,
+    _In_                             DWORD                     dwAction,
+    _In_                             DWORD                     dwFlags,
+    _In_opt_                         IInternetSecurityMgrSite *pSecuritySite,
+    _In_opt_                         IInternetSecurityManager *pISM);
+
+HRESULT WINAPI
+ZoneCheckUrlExCacheW(
+    _In_                             PCWSTR                    pszUrl,
+    _Out_writes_bytes_opt_(cbPolicy) PBYTE                     pbPolicy,
+    _In_                             DWORD                     cbPolicy,
+    _In_reads_bytes_opt_(cbContext)  PBYTE                     pbContext,
+    _In_                             DWORD                     cbContext,
+    _In_                             DWORD                     dwAction,
+    _In_                             DWORD                     dwFlags,
+    _In_opt_                         IInternetSecurityMgrSite *pSecuritySite,
+    _In_opt_                         IInternetSecurityManager *pISM);
+
+HRESULT WINAPI
+ZoneCheckPathA(
+    _In_     PCSTR pszPath,
+    _In_     DWORD dwAction,
+    _In_     DWORD dwFlags,
+    _In_opt_ IInternetSecurityMgrSite *pSecuritySite);
+
+HRESULT WINAPI
+ZoneCheckPathW(
+    _In_     PCWSTR pszPath,
+    _In_     DWORD dwAction,
+    _In_     DWORD dwFlags,
+    _In_opt_ IInternetSecurityMgrSite *pSecuritySite);
+
+HRESULT WINAPI
+ZoneCheckUrlA(
+    _In_     PCSTR   pszUrl,
+    _In_     DWORD   dwAction,
+    _In_     DWORD   dwFlags,
+    _In_opt_ IInternetSecurityMgrSite *pSecuritySite);
+
+HRESULT WINAPI
+ZoneCheckUrlW(
+    _In_     PCWSTR  pszUrl,
+    _In_     DWORD   dwAction,
+    _In_     DWORD   dwFlags,
+    _In_opt_ IInternetSecurityMgrSite *pSecuritySite);
+
+HRESULT WINAPI
+ZoneCheckUrlExA(
+    _In_                             PCSTR   pszUrl,
+    _Out_writes_bytes_opt_(cbPolicy) PBYTE   pbPolicy,
+    _In_                             DWORD   cbPolicy,
+    _In_reads_bytes_opt_(cbContext)  PBYTE   pbContext,
+    _In_                             DWORD   cbContext,
+    _In_                             DWORD   dwAction,
+    _In_                             DWORD   dwFlags,
+    _In_opt_                         IInternetSecurityMgrSite *pSecuritySite);
+
+HRESULT WINAPI
+ZoneCheckUrlExW(
+    _In_                             PCWSTR  pszUrl,
+    _Out_writes_bytes_opt_(cbPolicy) PBYTE   pbPolicy,
+    _In_                             DWORD   cbPolicy,
+    _In_reads_bytes_opt_(cbContext)  PBYTE   pbContext,
+    _In_                             DWORD   cbContext,
+    _In_                             DWORD   dwAction,
+    _In_                             DWORD   dwFlags,
+    _In_opt_                         IInternetSecurityMgrSite *pSecuritySite);
+
+HRESULT WINAPI
+ZoneCheckHost(
+    _In_   IInternetSecurityManager  *pISM,
+    _In_   PCWSTR                     pszUrl,
+    _In_   DWORD                      dwAction);
+
+HRESULT WINAPI
+ZoneCheckHostEx(
+    _In_                             IInternetSecurityManager *pISM,
+    _Out_writes_bytes_opt_(cbPolicy) PBYTE                     pbPolicy,
+    _In_                             DWORD                     cbPolicy,
+    _In_reads_bytes_opt_(cbContext)  PBYTE                     pbContext,
+    _In_                             DWORD                     cbContext,
+    _In_                             PCWSTR                    pszUrl,
+    _In_                             DWORD                     dwAction);
+
+#ifdef UNICODE
+    #define ZoneCheckUrlExCache ZoneCheckUrlExCacheW
+    #define ZoneCheckPath ZoneCheckPathW
+    #define ZoneCheckUrl ZoneCheckUrlW
+    #define ZoneCheckUrlEx ZoneCheckUrlExW
+#else
+    #define ZoneCheckUrlExCache ZoneCheckUrlExCacheA
+    #define ZoneCheckPath ZoneCheckPathA
+    #define ZoneCheckUrl ZoneCheckUrlA
+    #define ZoneCheckUrlEx ZoneCheckUrlExA
 #endif
 
 #ifdef __cplusplus

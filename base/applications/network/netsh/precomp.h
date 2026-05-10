@@ -5,8 +5,7 @@
  * COPYRIGHT:  Copyright 2023 Eric Kohl <eric.kohl@reactos.org>
  */
 
-#ifndef PRECOMP_H
-#define PRECOMP_H
+#pragma once
 
 /* INCLUDES ******************************************************************/
 
@@ -14,17 +13,16 @@
 #include <stdlib.h>
 #include <stdarg.h>
 
-#include <ndk/rtlfuncs.h>
-
 #define WIN32_NO_STATUS
 #include <windef.h>
 #include <winbase.h>
 #include <winreg.h>
 #include <wincon.h>
 #include <winuser.h>
+#include <iphlpapi.h>
 #include <iphlpapi_undoc.h>
 
-#include <errno.h>
+#include <ndk/rtlfuncs.h>
 
 #include <conutils.h>
 #include <netsh.h>
@@ -34,8 +32,6 @@
 
 
 /* DEFINES *******************************************************************/
-
-#define HUGE_BUFFER_SIZE  2048
 
 #define MAX_STRING_SIZE 1024
 #define MAX_ARGS_COUNT 256
@@ -73,8 +69,6 @@ typedef struct _HELPER_ENTRY
     struct _HELPER_ENTRY *pSubHelperTail;
 
 } HELPER_ENTRY, *PHELPER_ENTRY;
-
-
 
 typedef struct _COMMAND_ENTRY
 {
@@ -135,7 +129,7 @@ extern PCONTEXT_ENTRY pCurrentContext;
 
 extern PHELPER_ENTRY pHelperListHead;
 
-extern HMODULE hModule;
+extern HMODULE g_hModule;
 extern PWSTR pszMachine;
 
 /* PROTOTYPES *****************************************************************/
@@ -260,7 +254,6 @@ ShowHelperCommand(
     LPCVOID pvData,
     BOOL *pbDone);
 
-
 /* interpreter.c */
 
 DWORD
@@ -279,6 +272,4 @@ RunScript(
 LPWSTR
 MergeStrings(
     _In_ LPWSTR pszStringArray[],
-    _In_ INT nCount);
-
-#endif /* PRECOMP_H */
+    _In_ UINT nCount);

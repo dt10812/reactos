@@ -78,6 +78,73 @@ ShutdownRpc(VOID)
 /* Function 0 */
 DWORD
 __stdcall
+Server_EnableDhcp(
+    _In_ PDHCP_SERVER_NAME ServerName,
+    _In_ LPWSTR AdapterName,
+    _In_ BOOL Enable)
+{
+    PDHCP_ADAPTER Adapter;
+    struct protocol* proto;
+    DWORD ret = ERROR_SUCCESS;
+
+    DPRINT1("Server_EnableDhcp(%S %u)\n", AdapterName, Enable);
+
+    ApiLock();
+
+    Adapter = AdapterFindName(AdapterName);
+    if (Adapter == NULL)
+    {
+        ret = ERROR_FILE_NOT_FOUND;
+        goto done;
+    }
+
+    DPRINT1("Adapter: %p\n", Adapter);
+
+    if (Enable)
+    {
+        DPRINT1("Enable DHCP for Adapter: %p\n", Adapter);
+
+        if (Adapter->DhclientState.state != S_STATIC)
+        {
+            DPRINT1("The Adapter is already enabled!\n");
+            goto done;
+        }
+
+        add_protocol(Adapter->DhclientInfo.name,
+                     Adapter->DhclientInfo.rfdesc, got_one,
+                     &Adapter->DhclientInfo);
+
+        Adapter->DhclientInfo.client->state = S_INIT;
+        state_reboot(&Adapter->DhclientInfo);
+    }
+    else
+    {
+        DPRINT1("Disable DHCP for Adapter: %p\n", Adapter);
+
+        if (Adapter->DhclientState.state == S_STATIC)
+        {
+            DPRINT1("The Adapter is already disabled!\n");
+            goto done;
+        }
+
+        Adapter->DhclientState.state = S_STATIC;
+        proto = find_protocol_by_adapter(&Adapter->DhclientInfo);
+        if (proto)
+            remove_protocol(proto);
+    }
+
+    if (hAdapterStateChangedEvent != NULL)
+        SetEvent(hAdapterStateChangedEvent);
+
+done:
+    ApiUnlock();
+
+    return ret;
+}
+
+/* Function 1 */
+DWORD
+__stdcall
 Server_AcquireParameters(
     _In_ PDHCP_SERVER_NAME ServerName,
     _In_ LPWSTR AdapterName)
@@ -86,7 +153,7 @@ Server_AcquireParameters(
     struct protocol* proto;
     DWORD ret = ERROR_SUCCESS;
 
-    DPRINT("Server_AcquireParameters()\n");
+    DPRINT("Server_AcquireParameters(%S)\n", AdapterName);
 
     ApiLock();
 
@@ -119,8 +186,18 @@ done:
     return ret;
 }
 
+/* Function 2 */
+DWORD
+__stdcall
+Server_AcquireParametersByBroadcast(
+    _In_ PDHCP_SERVER_NAME ServerName,
+    _In_ LPWSTR AdapterName)
+{
+    DPRINT1("Server_AcquireParametersByBroadcast(%S) is unimplemented!\n", AdapterName);
+    return ERROR_SUCCESS;
+}
 
-/* Function 1 */
+/* Function 3 */
 DWORD
 __stdcall
 Server_ReleaseParameters(
@@ -131,7 +208,7 @@ Server_ReleaseParameters(
     struct protocol* proto;
     DWORD ret = ERROR_SUCCESS;
 
-    DPRINT("Server_ReleaseParameters()\n");
+    DPRINT("Server_ReleaseParameters(%S)\n", AdapterName);
 
     ApiLock();
 
@@ -159,24 +236,22 @@ done:
     return ret;
 }
 
-/* Function 2 */
+/* Function 4 */
 DWORD
 __stdcall
-Server_QueryHWInfo(
+Server_FallbackRefreshParams(
     _In_ PDHCP_SERVER_NAME ServerName,
-    _In_ DWORD AdapterIndex,
-    _Out_ PDWORD MediaType,
-    _Out_ PDWORD Mtu,
-    _Out_ PDWORD Speed)
+    _In_ LPWSTR AdapterName)
 {
     PDHCP_ADAPTER Adapter;
+    HKEY hAdapterKey;
     DWORD ret = ERROR_SUCCESS;
 
-    DPRINT("Server_QueryHWInfo()\n");
+    DPRINT("Server_FallbackRefreshParams(%S)\n", AdapterName);
 
     ApiLock();
 
-    Adapter = AdapterFindIndex(AdapterIndex);
+    Adapter = AdapterFindName(AdapterName);
     if (Adapter == NULL)
     {
         ret = ERROR_FILE_NOT_FOUND;
@@ -185,9 +260,18 @@ Server_QueryHWInfo(
 
     DPRINT("Adapter: %p\n", Adapter);
 
-    *MediaType = Adapter->IfMib.dwType;
-    *Mtu = Adapter->IfMib.dwMtu;
-    *Speed = Adapter->IfMib.dwSpeed;
+    if (Adapter->AlternateConfiguration)
+    {
+        free(Adapter->AlternateConfiguration);
+        Adapter->AlternateConfiguration = NULL;
+    }
+
+    hAdapterKey = FindAdapterKey(Adapter);
+    if (hAdapterKey)
+    {
+        ret = LoadAlternateConfiguration(Adapter, hAdapterKey);
+        RegCloseKey(hAdapterKey);
+    }
 
 done:
     ApiUnlock();
@@ -195,7 +279,8 @@ done:
     return ret;
 }
 
-/* Function 3 */
+
+/* Function 5 */
 DWORD
 __stdcall
 Server_StaticRefreshParams(
@@ -252,7 +337,7 @@ done:
     return ret;
 }
 
-/* Function 4 */
+/* Function 6 */
 DWORD
 __stdcall
 Server_RemoveDNSRegistrations(

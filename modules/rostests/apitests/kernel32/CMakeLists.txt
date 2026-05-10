@@ -17,6 +17,7 @@ list(APPEND SOURCE
     GetCPInfo.c
     GetCurrentDirectory.c
     GetDriveType.c
+    GetEnvironmentVariable.c
     GetFinalPathNameByHandle.c
     GetLocaleInfo.c
     GetModuleFileName.c
@@ -32,6 +33,7 @@ list(APPEND SOURCE
     lstrlen.c
     Mailslot.c
     MultiByteToWideChar.c
+    Pipes.c
     PrivMoveFileIdentityW.c
     QueueUserAPC.c
     SetComputerNameExW.c

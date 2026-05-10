@@ -5,7 +5,6 @@ add_definitions(
     -DWINE_REGISTER_DLL)
 
 remove_definitions(-D_WIN32_WINNT=0x502)
-remove_definitions(-D_CRT_NON_CONFORMING_SWPRINTFS)
 add_definitions(-D_WIN32_WINNT=0x600)
 
 include_directories(
@@ -82,6 +81,7 @@ if(MSVC)
 endif()
 
 set_module_type(windowscodecs win32dll)
+add_idl_reg_scripts(windowscodecs registry windowscodecs_wincodec.idl)
 target_link_libraries(windowscodecs wine uuid ${PSEH_LIB} oldnames)
 add_importlibs(windowscodecs libjpeg libpng libtiff ole32 oleaut32 rpcrt4 shlwapi user32 gdi32 advapi32 advapi32_vista propsys msvcrt kernel32 ntdll)
 add_pch(windowscodecs precomp.h "${PCH_SKIP_SOURCE}")

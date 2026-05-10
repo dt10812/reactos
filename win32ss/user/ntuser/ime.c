@@ -8,7 +8,7 @@
  */
 
 #include <win32k.h>
-#include <jpnvkeys.h>
+#include <ime.h>
 #include <cjkcode.h>
 
 DBG_DEFAULT_CHANNEL(UserMisc);
@@ -295,7 +295,7 @@ IntCheckImeHotKey(
 {
     PIMEHOTKEY pHotKey;
     UINT uModifiers;
-    BOOL bKeyUp = (lParam & 0x80000000);
+    BOOL bKeyUp = (HIWORD(lParam) & KF_UP);
     const BYTE *KeyState = MessageQueue->afKeyState;
     static UINT s_uKeyUpVKey = 0;
 
@@ -681,7 +681,7 @@ IntImmProcessKey(
         if (!pIMC)
             return 0;
 
-        if ((lParam & (KF_UP << 16)) &&
+        if ((HIWORD(lParam) & KF_UP) &&
             (pKL->piiex->ImeInfo.fdwProperty & IME_PROP_IGNORE_UPKEYS))
         {
             return 0;
@@ -690,7 +690,7 @@ IntImmProcessKey(
         switch (uVirtualKey)
         {
             case VK_DBE_CODEINPUT:
-            case VK_DBE_ENTERCONFIGMODE:
+            case VK_DBE_ENTERIMECONFIGMODE:
             case VK_DBE_ENTERWORDREGISTERMODE:
             case VK_DBE_HIRAGANA:
             case VK_DBE_KATAKANA:
@@ -709,7 +709,7 @@ IntImmProcessKey(
 
                 if (!(pKL->piiex->ImeInfo.fdwProperty & IME_PROP_NEED_ALTKEY))
                 {
-                    if (uVirtualKey == VK_MENU || (lParam & 0x20000000))
+                    if (uVirtualKey == VK_MENU || (HIWORD(lParam) & KF_ALTDOWN))
                         return 0;
                 }
                 break;
@@ -1117,6 +1117,20 @@ Quit:
     return ret;
 }
 
+/*
+ * https://learn.microsoft.com/en-us/windows/win32/api/ime/ns-ime-imestruct IME_SETLEVEL
+ *
+ * "Application IME Level" is a Korean-IME-specific concept, defined as below:
+ *
+ * Level | Meaning
+ * ------+---------------------------------------------------------------------------------
+ *    1  | No IME support. All IME-specific messages are ignored.
+ *    2  | Partial IME support. Supports a subset of IME behavior including the position of
+ *       | the composition or candidate windows and the input mode or status.
+ *    3  | Full IME support.
+ *    4  | (Unknown)
+ *    5  | (Unknown)
+ */
 BOOL
 NTAPI
 NtUserSetAppImeLevel(

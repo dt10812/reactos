@@ -6,23 +6,23 @@
 # COPYRIGHT:   Copyright 2006 Ge van Geldorp <gvg@reactos.org>
 #
 @ stdcall DhcpAcquireParameters(wstr)
-@ stub DhcpAcquireParametersByBroadcast
+@ stdcall DhcpAcquireParametersByBroadcast(wstr)
 @ stdcall DhcpCApiCleanup()
 @ stdcall DhcpCApiInitialize(ptr)
 @ stub DhcpDelPersistentRequestParams
 @ stub DhcpDeRegisterOptions
 @ stub DhcpDeRegisterParamChange
 @ stdcall DhcpEnumClasses(long wstr long long)
-@ stub DhcpFallbackRefreshParams
+@ stdcall DhcpFallbackRefreshParams(wstr)
 @ stdcall DhcpHandlePnPEvent(long long wstr long long)
 @ stub DhcpLeaseIpAddress
 @ stub DhcpLeaseIpAddressEx
 @ stdcall DhcpNotifyConfigChange(ptr ptr long long long long long)
-@ stub DhcpNotifyConfigChangeEx
+@ stdcall DhcpNotifyConfigChangeEx(ptr ptr long long long long long long)
 @ stub DhcpNotifyMediaReconnected
 @ stub DhcpOpenGlobalEvent
 @ stub DhcpPersistentRequestParams
-@ stdcall DhcpQueryHWInfo(long ptr ptr ptr)
+@ stub DhcpQueryHWInfo
 @ stub DhcpRegisterOptions
 @ stub DhcpRegisterParamChange
 @ stub DhcpReleaseIpAddressLease

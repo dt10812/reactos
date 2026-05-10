@@ -46,11 +46,6 @@ extern POBJECT_TYPE NTSYSAPI PsJobType;
 #endif // !NTOS_MODE_USER
 
 //
-// KUSER_SHARED_DATA location in User Mode
-//
-#define USER_SHARED_DATA                        (0x7FFE0000)
-
-//
 // Global Flags
 //
 #define FLG_STOP_ON_EXCEPTION                   0x00000001
@@ -1340,6 +1335,11 @@ typedef struct _ETHREAD
     LIST_ENTRY AlpcWaitListEntry;
     KSEMAPHORE AlpcWaitSemaphore;
     ULONG CacheManagerCount;
+#endif
+    // TODO: Missing Vista+ members
+#if (NTDDI_VERSION >= NTDDI_WIN10_RS1) || defined(__REACTOS__)
+    PUNICODE_STRING ThreadName;
+    // TODO: Missing Win10+ members
 #endif
 } ETHREAD;
 

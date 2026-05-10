@@ -9,7 +9,8 @@ add_definitions(
     -DPROXY_DELEGATION
     -DWINE_REGISTER_DLL
     -DENTRY_PREFIX=OLEAUTPS_
-    -DPROXY_CLSID=CLSID_PSFactoryBuffer)
+    -DPROXY_CLSID=CLSID_PSFactoryBuffer
+    -D_CRT_NON_CONFORMING_SWPRINTFS)
 
 spec2def(oleaut32.dll oleaut32.spec ADD_IMPORTLIB)
 add_rpcproxy_files(oleaut32_oaidl.idl oleaut32_ocidl.idl)
@@ -51,6 +52,10 @@ if(MSVC)
     # Disable warning C4146: unary minus operator applied to unsigned type, result still unsigned
     # Disable warning C4267: 'initializing': conversion from 'size_t' to 'BYTE', possible loss of data
     target_compile_options(oleaut32 PRIVATE /wd4146 /wd4267)
+endif()
+
+if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(oleaut32 PRIVATE -Wno-misleading-indentation)
 endif()
 
 add_idl_headers(oleaut32_idlheader oleaut32_oaidl.idl)

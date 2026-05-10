@@ -17,14 +17,17 @@ list(APPEND ROSLOAD_SOURCE
     oslist.c
     lib/rtl/libsupp.c
     ${REACTOS_SOURCE_DIR}/ntoskrnl/config/cmboot.c
+    ${REACTOS_SOURCE_DIR}/ntoskrnl/ke/config.c
+    ntldr/advopts.c
     ntldr/conversion.c
+    ntldr/headless.c
     ntldr/inffile.c
+    ntldr/ntldropts.c
     ntldr/registry.c
     ntldr/setupldr.c
     ntldr/winldr.c
     ntldr/wlmemory.c
-    ntldr/wlregistry.c
-)
+    ntldr/wlregistry.c)
 
 if(ARCH STREQUAL "i386")
 
@@ -32,8 +35,7 @@ if(ARCH STREQUAL "i386")
         arch/i386/halstub.c
         arch/i386/ntoskrnl.c
         disk/scsiport.c
-        ntldr/arch/i386/winldr.c
-        ntldr/headless.c)
+        ntldr/arch/i386/winldr.c)
 
     list(APPEND ROSLOAD_ASM_SOURCE
         arch/i386/drvmap.S
@@ -46,8 +48,7 @@ elseif(ARCH STREQUAL "amd64")
 
     list(APPEND ROSLOAD_ASM_SOURCE
         arch/amd64/misc.S
-        arch/amd64/linux.S
-    )
+        arch/amd64/linux.S)
 
 elseif(ARCH STREQUAL "arm")
 
@@ -78,11 +79,11 @@ set_image_base(rosload 0x10000) # 0x200000
 set_subsystem(rosload native)
 set_entrypoint(rosload RunLoader)
 
+target_link_libraries(rosload blcmlib blrtl libcntpr)
 if(ARCH STREQUAL "i386")
     target_link_libraries(rosload mini_hal)
 endif()
 
-target_link_libraries(rosload blcmlib blrtl libcntpr)
 add_importlibs(rosload freeldr)
 
 # dynamic analysis switches
@@ -96,4 +97,4 @@ endif()
 
 add_dependencies(rosload bugcodes asm xdk)
 
-add_cd_file(TARGET rosload DESTINATION loader NO_CAB FOR bootcd regtest livecd hybridcd)
+add_cd_file(TARGET rosload DESTINATION loader NO_CAB FOR bootcd regtest)

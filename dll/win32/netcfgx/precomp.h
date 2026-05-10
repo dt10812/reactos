@@ -25,6 +25,7 @@
 #include <cfgmgr32.h>
 
 #include <netcfgx_undoc.h>
+#include <netcfgn_undoc.h>
 
 #include <wine/debug.h>
 
@@ -50,9 +51,17 @@ typedef struct tagNetCfgComponentItem
     DWORD dwCharacteristics;    //Y
     ULONG Status;               //Y
     BOOL bChanged;              //Y
+    LPWSTR pszUpperRange;
+    LPWSTR pszLowerRange;
     LPWSTR pszBinding;
-    struct tagNetCfgComponentItem * pNext;
-    INetCfgComponentControl * pNCCC;
+    DWORD dwSupportedNotifications;
+    INetCfgComponentControl *pControl;
+    INetCfgComponentPropertyUi *pPropertyUi;
+    INetCfgComponentSetup *pSetup;
+    INetCfgComponentNotifyBinding *pNotifyBinding;
+    INetCfgComponentNotifyGlobal *pNotifyGlobal;
+    INetCfgComponentUpperEdge *pUpperEdge;
+    struct tagNetCfgComponentItem *pNext;
 } NetCfgComponentItem;
 
 typedef struct

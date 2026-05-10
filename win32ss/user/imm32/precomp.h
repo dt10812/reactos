@@ -187,3 +187,16 @@ LRESULT
 CtfImmSetLangBand(
     _In_ HWND hWnd,
     _In_ BOOL fSet);
+
+DWORD
+WINNLSTranslateMessage(
+    _In_ INT cEntries,
+    _Inout_ PTRANSMSG pEntries,
+    _In_ HIMC hIMC,
+    _In_ BOOL bAnsi,
+    _In_ WORD wLang);
+
+HIMC
+ImmGetSaveContext(
+    _In_opt_ HWND hWnd,
+    _In_ DWORD dwContextFlags);
