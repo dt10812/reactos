@@ -28,19 +28,32 @@ KiScanReadyQueues(IN PKDPC Dpc,
 {
     PULONG ScanLast = DeferredContext;
     ULONG ScanIndex = *ScanLast;
-    ULONG Count = 10, Number = 16;
-    PKPRCB Prcb = KiProcessorBlock[ScanIndex];
-    ULONG Index = Prcb->QueueIndex;
+    ULONG Count = 10;
+    ULONG Number = 16;
+    PKPRCB Prcb;
+    ULONG Index;
     ULONG WaitLimit = KeTickCount.LowPart - 300;
     ULONG Summary;
     KIRQL OldIrql;
-    PLIST_ENTRY ListHead, NextEntry;
+    PLIST_ENTRY ListHead, NextEntry, TargetEntry;
     PKTHREAD Thread;
+
+    UNREFERENCED_PARAMETER(Dpc);
+    UNREFERENCED_PARAMETER(SystemArgument1);
+    UNREFERENCED_PARAMETER(SystemArgument2);
+
+    /* 1. Prevent out-of-bounds array reads if CPU counts hot-plugged */
+    if (ScanIndex >= (ULONG)KeNumberProcessors) ScanIndex = 0;
+
+    /* 2. Safely resolve the PRCB target pointer BEFORE accessing its internal members */
+    Prcb = KiProcessorBlock[ScanIndex];
+    Index = Prcb->QueueIndex;
 
     /* Lock the dispatcher and PRCB */
     OldIrql = KiAcquireDispatcherLock();
     KiAcquirePrcbLock(Prcb);
-    /* Check if there's any thread that need help */
+
+    /* Check if there's any dynamic priority tier thread that needs an anti-starvation help */
     Summary = Prcb->ReadySummary & ((1 << THREAD_BOOST_PRIORITY) - 2);
     if (Summary)
     {
@@ -60,78 +73,84 @@ KiScanReadyQueues(IN PKDPC Dpc,
                 Summary ^= PRIORITY_MASK(Index);
                 ListHead = &Prcb->DispatcherReadyListHead[Index];
                 NextEntry = ListHead->Flink;
+                
                 do
                 {
-                    /* Select a thread */
-                    Thread = CONTAINING_RECORD(NextEntry,
-                                               KTHREAD,
-                                               WaitListEntry);
+                    /* FIX: Map structural bounds using ReadyListEntry, NOT WaitListEntry */
+                    Thread = CONTAINING_RECORD(NextEntry, KTHREAD, ReadyListEntry);
                     ASSERT(Thread->Priority == Index);
 
-                    /* Check if the thread has been waiting too long */
+                    /* Check if the thread has been waiting too long (>= 3 seconds) */
                     if (WaitLimit >= Thread->WaitTime)
                     {
-                        /* Remove the thread from the queue */
+                        /* Save target entry pointer for isolated extraction */
+                        TargetEntry = NextEntry;
+
+                        /* Rewind loop tracking pointer to the previous link to maintain a valid reference */
                         NextEntry = NextEntry->Blink;
+
                         ASSERT((Prcb->ReadySummary & PRIORITY_MASK(Index)));
-                        if (RemoveEntryList(NextEntry->Flink))
+                        
+                        /* Extract the starved thread from the scheduler's live list */
+                        if (RemoveEntryList(TargetEntry))
                         {
-                            /* The list is empty now */
+                            /* The list is empty now; update the PRCB ready summary bits */
                             Prcb->ReadySummary ^= PRIORITY_MASK(Index);
                         }
 
-                        /* Verify priority decrement and set the new one */
+                        /* Verify priority decrement and calculate anti-starvation adjustments */
                         ASSERT((Thread->PriorityDecrement >= 0) &&
-                               (Thread->PriorityDecrement <=
-                                Thread->Priority));
-                        Thread->PriorityDecrement += (THREAD_BOOST_PRIORITY -
-                                                      Thread->Priority);
+                               (Thread->PriorityDecrement <= Thread->Priority));
+                        
+                        Thread->PriorityDecrement += (THREAD_BOOST_PRIORITY - Thread->Priority);
+                        
                         ASSERT((Thread->PriorityDecrement >= 0) &&
-                               (Thread->PriorityDecrement <=
-                                THREAD_BOOST_PRIORITY));
+                               (Thread->PriorityDecrement <= THREAD_BOOST_PRIORITY));
 
-                        /* Update priority and insert into ready list */
+                        /* Update priority metrics and shift onto the deferred ready list matrix */
                         Thread->Priority = THREAD_BOOST_PRIORITY;
                         Thread->Quantum = WAIT_QUANTUM_DECREMENT * 4;
                         KiInsertDeferredReadyList(Thread);
-                        Count --;
+                        
+                        Count--;
                     }
 
-                    /* Go to the next entry */
+                    /* Safely advance to the next entry in the sequence */
                     NextEntry = NextEntry->Flink;
                     Number--;
-                } while((NextEntry != ListHead) && (Number) && (Count));
+                    
+                } while ((NextEntry != ListHead) && (Number != 0) && (Count != 0));
             }
 
-            /* Increase index */
+            /* Increase scanning priority index slot */
             Index++;
-        } while ((Summary) && (Number) && (Count));
+            
+        } while ((Summary != 0) && (Number != 0) && (Count != 0));
     }
 
-    /* Release the locks and dispatcher */
+    /* Release the localized PRCB and global dispatcher architecture locks */
     KiReleasePrcbLock(Prcb);
     KiReleaseDispatcherLock(OldIrql);
 
-    /* Update the queue index for next time */
-    if ((Count) && (Number))
+    /* Update the queue index checkpoint state for next interval pass */
+    if ((Count != 0) && (Number != 0))
     {
-        /* Reset the queue at index 1 */
+        /* We fully scanned the queues; cycle baseline back to index 1 */
         Prcb->QueueIndex = 1;
     }
     else
     {
-        /* Set the index we're in now */
-        Prcb->QueueIndex = Index;
+        /* Search budget exhausted; store current slot index for resuming later */
+        Prcb->QueueIndex = (UCHAR)Index;
     }
 
-    /* Increment the CPU number for next time and normalize to CPU count */
+    /* Increment the target CPU slot metrics for the next background execution pass */
     ScanIndex++;
-    if (ScanIndex == KeNumberProcessors) ScanIndex = 0;
+    if (ScanIndex >= (ULONG)KeNumberProcessors) ScanIndex = 0;
 
-    /* Return the index */
+    /* Save the next target execution seed back into the context buffer safely */
     *ScanLast = ScanIndex;
 }
-
 VOID
 NTAPI
 KeBalanceSetManager(IN PVOID Context)

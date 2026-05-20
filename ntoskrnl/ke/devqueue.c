@@ -59,6 +59,8 @@ KeInsertDeviceQueue(IN PKDEVICE_QUEUE DeviceQueue,
     }
     else
     {
+        /* Prevent list corruption if a driver tries to double-insert an entry */
+        ASSERT(DeviceQueueEntry->Inserted == FALSE);
         /* Insert it into the list */
         Inserted = TRUE;
         InsertTailList(&DeviceQueue->DeviceListHead,
@@ -107,6 +109,7 @@ KeInsertByKeyDeviceQueue(IN PKDEVICE_QUEUE DeviceQueue,
     }
     else
     {
+        ASSERT(DeviceQueueEntry->Inserted == FALSE);
         /* Make sure the list isn't empty */
         NextEntry = &DeviceQueue->DeviceListHead;
         if (!IsListEmpty(NextEntry))
@@ -235,12 +238,9 @@ KeRemoveByKeyDeviceQueue(IN PKDEVICE_QUEUE DeviceQueue,
         {
             /* Loop the list */
             NextEntry = DeviceQueue->DeviceListHead.Flink;
-            while (TRUE)
+            while (NextEntry != &DeviceQueue->DeviceListHead)
             {
-                /* Make sure we don't go beyond the end of the queue */
-                ASSERT(NextEntry != &DeviceQueue->DeviceListHead);
-
-                /* Get the next entry and check if the key is low enough */
+                /* Get the entry structure and check if the key is high enough */
                 ReturnEntry = CONTAINING_RECORD(NextEntry,
                                                 KDEVICE_QUEUE_ENTRY,
                                                 DeviceListEntry);
@@ -248,6 +248,14 @@ KeRemoveByKeyDeviceQueue(IN PKDEVICE_QUEUE DeviceQueue,
 
                 /* Try the next one */
                 NextEntry = NextEntry->Flink;
+            }
+
+            /* If we swept the entire queue without a match, default to the tail node */
+            if (NextEntry == &DeviceQueue->DeviceListHead)
+            {
+                ReturnEntry = CONTAINING_RECORD(DeviceQueue->DeviceListHead.Blink,
+                                                KDEVICE_QUEUE_ENTRY,
+                                                DeviceListEntry);
             }
         }
 

@@ -173,14 +173,24 @@ VOID
 NTAPI
 KeQuerySystemTime(OUT PLARGE_INTEGER CurrentTime)
 {
-    /* Loop until we get a perfect match */
+    volatile KSYSTEM_TIME *TargetTime = (volatile KSYSTEM_TIME*)&SharedUserData->SystemTime;
+
     for (;;)
     {
-        /* Read the time value */
-        CurrentTime->HighPart = SharedUserData->SystemTime.High1Time;
-        CurrentTime->LowPart = SharedUserData->SystemTime.LowPart;
-        if (CurrentTime->HighPart ==
-            SharedUserData->SystemTime.High2Time) break;
+        CurrentTime->HighPart = TargetTime->High1Time;
+        
+        /* Enforce a compiler reordering block right here. 
+        This guarantees High1Time is read BEFORE LowPart. */
+        #if defined(__GNUC__) || defined(__clang__)
+        __asm__ __volatile__("" : : : "memory");
+        #elif defined(_MSC_VER)
+        _ReadWriteBarrier();
+        #else
+        MemoryBarrier();
+        #endif
+        CurrentTime->LowPart = TargetTime->LowPart;
+
+        if (CurrentTime->HighPart == TargetTime->High2Time) break;
         YieldProcessor();
     }
 }
@@ -197,11 +207,12 @@ KeQueryInterruptTime(VOID)
     /* Loop until we get a perfect match */
     for (;;)
     {
-        /* Read the time value */
-        CurrentTime.HighPart = SharedUserData->InterruptTime.High1Time;
-        CurrentTime.LowPart = SharedUserData->InterruptTime.LowPart;
-        if (CurrentTime.HighPart ==
-            SharedUserData->InterruptTime.High2Time) break;
+        CurrentTime.HighPart = TargetTime->High1Time;
+        CurrentTime.LowPart = TargetTime->LowPart;
+        
+        MemoryBarrier();
+        
+        if (CurrentTime.HighPart == TargetTime->High2Time) break;
         YieldProcessor();
     }
 

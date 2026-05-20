@@ -197,8 +197,11 @@ KeSignalGateBoostPriority(IN PKGATE Gate)
             /* Release the thread lock */
             KiReleaseThreadLock(WaitThread);
 
-            /* FIXME: Boosting */
-
+            if (WaitThread->Priority < LOW_REALTIME_PRIORITY)
+            {
+                /* Target increment value for a Gate/Pushlock object resolution */
+                KiBoostPriorityThread(WaitThread, 1);
+            }
             /* Check if we have a queue */
             if (WaitThread->Queue)
             {

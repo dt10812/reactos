@@ -310,31 +310,30 @@ KiParseProfileList(IN PKTRAP_FRAME TrapFrame,
     PLIST_ENTRY NextEntry;
     ULONG_PTR ProgramCounter;
 
-    /* Get the Program Counter */
+    /* Get the Program Counter from the trap frame */
     ProgramCounter = KeGetTrapFramePc(TrapFrame);
 
-    /* Loop the List */
+    /* Loop through the profile objects registry list */
     for (NextEntry = ListHead->Flink;
          NextEntry != ListHead;
          NextEntry = NextEntry->Flink)
     {
-        /* Get the entry */
+        /* Get the profile structure entry matching this node */
         Profile = CONTAINING_RECORD(NextEntry, KPROFILE, ProfileListEntry);
 
-        /* Check if the source is good, and if it's within the range */
         if ((Profile->Source != Source) ||
             (ProgramCounter < (ULONG_PTR)Profile->RangeBase) ||
-            (ProgramCounter > (ULONG_PTR)Profile->RangeLimit))
+            (ProgramCounter >= (ULONG_PTR)Profile->RangeLimit))
         {
             continue;
         }
 
-        /* Get the Pointer to the Bucket Value representing this Program Counter */
+        /* Compute the safe pointer to the hit counter tracking bucket value */
         BucketValue = (PULONG)((ULONG_PTR)Profile->Buffer +
                                (((ProgramCounter - (ULONG_PTR)Profile->RangeBase)
                                 >> Profile->BucketShift) &~ 0x3));
 
-        /* Increment the value */
+        /* Record the profiling sample tick */
         (*BucketValue)++;
     }
 }

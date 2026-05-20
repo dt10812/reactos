@@ -116,15 +116,10 @@ KeReleaseMutant(IN PKMUTANT Mutant,
     /* Check if it is to be abandonned */
     if (Abandon == FALSE)
     {
-        /* Make sure that the Owner Thread is the current Thread */
         if (Mutant->OwnerThread != CurrentThread)
         {
-            /* Release the lock */
             KiReleaseDispatcherLock(OldIrql);
-
-            /* Raise an exception */
-            ExRaiseStatus(Mutant->Abandoned ? STATUS_ABANDONED :
-                                              STATUS_MUTANT_NOT_OWNED);
+            ExRaiseStatus(STATUS_MUTANT_NOT_OWNED);
         }
 
         /* If the thread owns it, then increase the signal state */

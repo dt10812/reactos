@@ -47,23 +47,20 @@ KiProcessorFreezeHandler(
     PKPRCB CurrentPrcb = KeGetCurrentPrcb();
 
     /* Make sure this is a freeze request */
-    if (CurrentPrcb->IpiFrozen != IPI_FROZEN_STATE_TARGET_FREEZE)
+    if (*(volatile LONG*)&CurrentPrcb->IpiFrozen != IPI_FROZEN_STATE_TARGET_FREEZE)
     {
-        /* Not a freeze request, return FALSE to signal it is unhandled */
         return FALSE;
     }
 
-    /* We are frozen now */
-    CurrentPrcb->IpiFrozen = IPI_FROZEN_STATE_FROZEN;
+    *(volatile LONG*)&CurrentPrcb->IpiFrozen = IPI_FROZEN_STATE_FROZEN;
 
     /* Save the processor state */
     KiSaveProcessorState(TrapFrame, ExceptionFrame);
 
-    /* Wait for the freeze owner to release us */
-    while (CurrentPrcb->IpiFrozen != IPI_FROZEN_STATE_THAW)
+    while (*(volatile LONG*)&CurrentPrcb->IpiFrozen != IPI_FROZEN_STATE_THAW)
     {
-        /* Check for Kd processor switch */
-        if (CurrentPrcb->IpiFrozen & IPI_FROZEN_FLAG_ACTIVE)
+        /* Check if we are the active debugger target */
+        if (*(volatile LONG*)&CurrentPrcb->IpiFrozen & IPI_FROZEN_FLAG_ACTIVE)
         {
             KCONTINUE_STATUS ContinueStatus;
 
@@ -108,12 +105,9 @@ KxFreezeExecution(
         return;
     }
 
-    /* Try to acquire the freeze owner */
-    while (InterlockedCompareExchangePointer(&KiFreezeOwner, CurrentPrcb, NULL))
+    while (InterlockedCompareExchangePointer((PVOID volatile*)&KiFreezeOwner, CurrentPrcb, NULL) != NULL)
     {
-        /* Someone else was faster. We expect an NMI to freeze any time.
-           Spin here until the freeze owner is available. */
-        while (KiFreezeOwner != NULL)
+        while (*(PVOID volatile*)&KiFreezeOwner != NULL)
         {
             YieldProcessor();
             KeMemoryBarrier();
@@ -121,7 +115,7 @@ KxFreezeExecution(
     }
 
     /* We are the owner now and active */
-    CurrentPrcb->IpiFrozen = IPI_FROZEN_STATE_OWNER | IPI_FROZEN_FLAG_ACTIVE;
+    *(volatile LONG*)&CurrentPrcb->IpiFrozen = IPI_FROZEN_STATE_OWNER | IPI_FROZEN_FLAG_ACTIVE;
 
     /* Loop all processors */
     for (ULONG i = 0; i < KeNumberProcessors; i++)
@@ -130,10 +124,10 @@ KxFreezeExecution(
         if (TargetPrcb != CurrentPrcb)
         {
             /* Only the active processor is allowed to change IpiFrozen */
-            ASSERT(TargetPrcb->IpiFrozen == IPI_FROZEN_STATE_RUNNING);
+            ASSERT(*(volatile LONG*)&TargetPrcb->IpiFrozen == IPI_FROZEN_STATE_RUNNING);
 
             /* Request target to freeze */
-            TargetPrcb->IpiFrozen = IPI_FROZEN_STATE_TARGET_FREEZE;
+            *(volatile LONG*)&TargetPrcb->IpiFrozen = IPI_FROZEN_STATE_TARGET_FREEZE;
         }
     }
 
@@ -164,7 +158,7 @@ KxThawExecution(
     VOID)
 {
     PKPRCB CurrentPrcb = KeGetCurrentPrcb();
-    ASSERT(CurrentPrcb->IpiFrozen & IPI_FROZEN_FLAG_ACTIVE);
+    ASSERT(*(volatile LONG*)&CurrentPrcb->IpiFrozen & IPI_FROZEN_FLAG_ACTIVE);
 
     /* Loop all processors */
     for (ULONG i = 0; i < KeNumberProcessors; i++)
@@ -173,10 +167,10 @@ KxThawExecution(
         if (TargetPrcb != CurrentPrcb)
         {
             /* Make sure they are still frozen */
-            ASSERT(TargetPrcb->IpiFrozen == IPI_FROZEN_STATE_FROZEN);
+            ASSERT(*(volatile LONG*)&TargetPrcb->IpiFrozen == IPI_FROZEN_STATE_FROZEN);
 
             /* Request target to thaw */
-            TargetPrcb->IpiFrozen = IPI_FROZEN_STATE_THAW;
+            *(volatile LONG*)&TargetPrcb->IpiFrozen = IPI_FROZEN_STATE_THAW;
         }
     }
 
@@ -186,8 +180,7 @@ KxThawExecution(
         PKPRCB TargetPrcb = KiProcessorBlock[i];
         if (TargetPrcb != CurrentPrcb)
         {
-            /* Wait for the target to be running again */
-            while (TargetPrcb->IpiFrozen != IPI_FROZEN_STATE_RUNNING)
+            while (*(volatile LONG*)&TargetPrcb->IpiFrozen != IPI_FROZEN_STATE_RUNNING)
             {
                 YieldProcessor();
                 KeMemoryBarrier();
@@ -196,10 +189,10 @@ KxThawExecution(
     }
 
     /* We are running again now */
-    CurrentPrcb->IpiFrozen = IPI_FROZEN_STATE_RUNNING;
+    *(volatile LONG*)&CurrentPrcb->IpiFrozen = IPI_FROZEN_STATE_RUNNING;
 
     /* Release the freeze owner */
-    InterlockedExchangePointer(&KiFreezeOwner, NULL);
+    InterlockedExchangePointer((PVOID volatile*)&KiFreezeOwner, NULL);
 }
 
 KCONTINUE_STATUS
@@ -214,8 +207,8 @@ KxSwitchKdProcessor(
     ASSERT(ProcessorIndex < KeNumberProcessors);
 
     /* We are no longer active */
-    ASSERT(CurrentPrcb->IpiFrozen & IPI_FROZEN_FLAG_ACTIVE);
-    CurrentPrcb->IpiFrozen &= ~IPI_FROZEN_FLAG_ACTIVE;
+    ASSERT(*(volatile LONG*)&CurrentPrcb->IpiFrozen & IPI_FROZEN_FLAG_ACTIVE);
+    *(volatile LONG*)&CurrentPrcb->IpiFrozen &= ~IPI_FROZEN_FLAG_ACTIVE;
 
     /* Inform the target processor that it's his turn now */
     TargetPrcb = KiProcessorBlock[ProcessorIndex];
