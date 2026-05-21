@@ -191,17 +191,24 @@ KeSignalGateBoostPriority(IN PKGATE Gate)
             WaitThread->State = DeferredReady;
             WaitThread->DeferredProcessor = KeGetCurrentPrcb()->Number;
 
+            if (WaitThread->Priority < LOW_REALTIME_PRIORITY)
+        {
+                WaitThread->Priority++;
+
+                if (WaitThread->Priority >= LOW_REALTIME_PRIORITY)
+                {
+                    WaitThread->Priority = (CHAR)(LOW_REALTIME_PRIORITY - 1);
+                }
+            }
+
+            KiInsertDeferredReadyList(WaitThread);
+
             /* Release the gate lock */
             KiReleaseDispatcherObject(&Gate->Header);
 
             /* Release the thread lock */
             KiReleaseThreadLock(WaitThread);
 
-            if (WaitThread->Priority < LOW_REALTIME_PRIORITY)
-            {
-                /* Target increment value for a Gate/Pushlock object resolution */
-                KiBoostPriorityThread(WaitThread, 1);
-            }
             /* Check if we have a queue */
             if (WaitThread->Queue)
             {

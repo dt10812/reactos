@@ -76,8 +76,7 @@ KiScanReadyQueues(IN PKDPC Dpc,
                 
                 do
                 {
-                    /* FIX: Map structural bounds using ReadyListEntry, NOT WaitListEntry */
-                    Thread = CONTAINING_RECORD(NextEntry, KTHREAD, ReadyListEntry);
+                    Thread = CONTAINING_RECORD(NextEntry, KTHREAD, WaitListEntry);
                     ASSERT(Thread->Priority == Index);
 
                     /* Check if the thread has been waiting too long (>= 3 seconds) */

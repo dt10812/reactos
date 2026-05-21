@@ -131,13 +131,14 @@ VOID
 NTAPI
 _KeEnterGuardedRegion(VOID)
 {
-    /* * Guarded regions manipulate the core scheduler thread state structures.
+    PKTHREAD Thread = KeGetCurrentThread();
+
+    /* Guarded regions manipulate the core scheduler thread state structures.
      * Running this at DISPATCH_LEVEL or above would cause severe system stability issues.
      */
     ASSERT_IRQL_LESS_OR_EQUAL(APC_LEVEL);
 
-    /* Use the underlying architecture-level intrinsic/inline macro directly */
-    _KeEnterGuardedRegion();
+    Thread->SpecialApcDisable--;
 }
 
 /**
@@ -149,10 +150,23 @@ VOID
 NTAPI
 _KeLeaveGuardedRegion(VOID)
 {
+    /* FIX: STRIP RECURSIVE RE-ENTRANCY PATHS BY RESOLVING LOCAL POINTER TO ACTIVE KTHREAD DEFINITION */
+    PKTHREAD Thread = KeGetCurrentThread();
+
     ASSERT_IRQL_LESS_OR_EQUAL(APC_LEVEL);
+    Thread->SpecialApcDisable++;
 
-    /* Use the underlying architecture-level intrinsic/inline macro directly */
-    _KeLeaveGuardedRegion();
+    if ((Thread->SpecialApcDisable == 0) && 
+        (!IsListEmpty(&Thread->ApcState.ApcListHead[KernelMode])))
+    {
+        if (KeGetCurrentIrql() == PASSIVE_LEVEL)
+        {
+            KiCheckForPendingApc(Thread);
+        }
+        else
+        {
+            HalRequestSoftwareInterrupt(APC_LEVEL);
+        }
+    }
 }
-
 /* EOF */
