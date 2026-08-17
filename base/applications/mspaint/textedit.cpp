@@ -59,7 +59,8 @@ void CTextEditWindow::FixEditPos(LPCWSTR pszOldText)
     HDC hDC = GetDC();
     if (hDC)
     {
-        SelectObject(hDC, m_hFontZoomed);
+        HFONT hOldFont = (HFONT)SelectObject(hDC, m_hFontZoomed);
+
         TEXTMETRIC tm;
         GetTextMetrics(hDC, &tm);
         szText += L"x"; // This is a trick to enable the g_ptEnd newlines
@@ -68,6 +69,8 @@ void CTextEditWindow::FixEditPos(LPCWSTR pszOldText)
         DrawTextW(hDC, szText, -1, &rcText, uFormat | DT_CALCRECT);
         if (tm.tmDescent > 0)
             rcText.bottom += tm.tmDescent;
+
+        SelectObject(hDC, hOldFont);
         ReleaseDC(hDC);
     }
 
@@ -197,7 +200,7 @@ LRESULT CTextEditWindow::OnSetCursor(UINT nMsg, WPARAM wParam, LPARAM lParam, BO
     if (nHitTest == HTCAPTION)
     {
         ::SetCursor(::LoadCursorW(NULL, (LPCWSTR)IDC_SIZEALL)); // Enable drag move
-        return FALSE;
+        return TRUE;
     }
     return DefWindowProc(nMsg, wParam, lParam);
 }

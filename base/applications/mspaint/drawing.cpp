@@ -368,6 +368,9 @@ Replace(HDC hdc, LONG x1, LONG y1, LONG x2, LONG y2, COLORREF fg, HBRUSH hBgBrus
 void
 Airbrush(HDC hdc, LONG x, LONG y, COLORREF color, LONG r)
 {
+    if (r <= 0)
+        return;
+
     for (LONG dy = -r; dy <= r; dy++)
     {
         for (LONG dx = -r; dx <= r; dx++)
@@ -381,6 +384,9 @@ Airbrush(HDC hdc, LONG x, LONG y, COLORREF color, LONG r)
 void
 Airbrush(HDC hdc, LONG x, LONG y, HBRUSH hBrush, LONG r)
 {
+    if (r <= 0)
+        return;
+
     for (LONG dy = -r; dy <= r; dy++)
     {
         for (LONG dx = -r; dx <= r; dx++)
@@ -573,21 +579,22 @@ ColorKeyedMaskBlt(HDC hdcDest, int nXDest, int nYDest, int nWidth, int nHeight,
     {
         if (keyColor == CLR_INVALID)
         {
-            ::StretchBlt(hdcDest, nXDest, nYDest, nWidth, nHeight,
-                         hdcSrc, nXSrc, nYSrc, nSrcWidth, nSrcHeight, SRCCOPY);
+            return ::StretchBlt(hdcDest, nXDest, nYDest, nWidth, nHeight,
+                                hdcSrc, nXSrc, nYSrc, nSrcWidth, nSrcHeight,
+                                SRCCOPY);
         }
         else
         {
-            ::GdiTransparentBlt(hdcDest, nXDest, nYDest, nWidth, nHeight,
-                                hdcSrc, nXSrc, nYSrc, nSrcWidth, nSrcHeight, keyColor);
+            return ::GdiTransparentBlt(hdcDest, nXDest, nYDest, nWidth, nHeight,
+                                       hdcSrc, nXSrc, nYSrc, nSrcWidth, nSrcHeight,
+                                       keyColor);
         }
-        return TRUE;
     }
     else if (nWidth == nSrcWidth && nHeight == nSrcHeight && keyColor == CLR_INVALID)
     {
-        ::MaskBlt(hdcDest, nXDest, nYDest, nWidth, nHeight,
-                  hdcSrc, nXSrc, nYSrc, hbmMask, 0, 0, MAKEROP4(SRCCOPY, 0xAA0029));
-        return TRUE;
+        return ::MaskBlt(hdcDest, nXDest, nYDest, nWidth, nHeight,
+                         hdcSrc, nXSrc, nYSrc, hbmMask, 0, 0,
+                         MAKEROP4(SRCCOPY, 0xAA0029));
     }
 
     hTempDC1 = ::CreateCompatibleDC(hdcDest);
@@ -595,10 +602,40 @@ ColorKeyedMaskBlt(HDC hdcDest, int nXDest, int nYDest, int nWidth, int nHeight,
     hbmTempMask = ::CreateBitmap(nWidth, nHeight, 1, 1, NULL);
     hbmTempColor = CreateColorDIB(nWidth, nHeight, RGB(255, 255, 255));
 
+    if (!hTempDC1 || !hTempDC2 || !hbmTempMask || !hbmTempColor)
+    {
+        if (hbmTempColor)
+            ::DeleteObject(hbmTempColor);
+        if (hbmTempMask)
+            ::DeleteObject(hbmTempMask);
+        if (hTempDC2)
+            ::DeleteDC(hTempDC2);
+        if (hTempDC1)
+            ::DeleteDC(hTempDC1);
+        return FALSE;
+    }
+
     // hbmTempMask <-- hbmMask (stretched)
     hbmOld1 = ::SelectObject(hTempDC1, hbmMask);
     hbmOld2 = ::SelectObject(hTempDC2, hbmTempMask);
-    ::StretchBlt(hTempDC2, 0, 0, nWidth, nHeight, hTempDC1, 0, 0, nSrcWidth, nSrcHeight, SRCCOPY);
+
+    if (!hbmOld1 || !hbmOld2)
+    {
+        if (hbmOld2)
+            ::SelectObject(hTempDC2, hbmOld2);
+        if (hbmOld1)
+            ::SelectObject(hTempDC1, hbmOld1);
+
+        ::DeleteObject(hbmTempColor);
+        ::DeleteObject(hbmTempMask);
+        ::DeleteDC(hTempDC2);
+        ::DeleteDC(hTempDC1);
+        return FALSE;
+    }
+
+    ::StretchBlt(hTempDC2, 0, 0, nWidth, nHeight,
+                 hTempDC1, 0, 0, nSrcWidth, nSrcHeight, SRCCOPY);
+
     ::SelectObject(hTempDC2, hbmOld2);
     ::SelectObject(hTempDC1, hbmOld1);
 
